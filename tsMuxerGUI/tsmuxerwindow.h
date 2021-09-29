@@ -3,7 +3,11 @@
 
 #include <QHeaderView>
 #include <QProcess>
+
+#ifndef TSMUXER_NO_QT_MULTIMEDIA
 #include <QSoundEffect>
+#endif
+
 #include <QTimer>
 #include <QTranslator>
 #include <QWidget>
@@ -193,7 +197,12 @@ class TsMuxerWindow : public QWidget
     void dragMoveEvent(QDragMoveEvent* event) override;
     void dragLeaveEvent(QDragLeaveEvent* event) override;
 
+#ifndef TSMUXER_NO_QT_MULTIMEDIA
     QSoundEffect sound;
+#else
+    bool sound;
+#endif
+    
     void myPlaySound(const QString& fileName);
     bool isVideoCropped();
 };
