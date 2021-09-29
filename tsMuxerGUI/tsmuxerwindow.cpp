@@ -16,9 +16,9 @@
 #else
 #include <iostream>
 #endif
+#include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTime>
-#include <QStandardPaths> 
 
 #include "checkboxedheaderview.h"
 #include "codecinfo.h"
@@ -1244,8 +1244,8 @@ void TsMuxerWindow::continueAddFile()
     if (!mplsFileList.empty())
         fileItem->setData(MplsItemRole, MPLS_PRIMARY);
     fileItem->setData(FileNameRole, newFileName);
-    //QVariant v;
-    //v.setValue<ChapterList>(chapters);
+    // QVariant v;
+    // v.setValue<ChapterList>(chapters);
     QVariant v = QVariant::fromValue<ChapterList>(chapters);
     fileItem->setData(ChaptersRole, v);
     fileItem->setData(FileDurationRole, fileDuration);
@@ -1490,8 +1490,8 @@ void TsMuxerWindow::doAppendInt(const QString &fileName, const QString &parentFi
     item->setData(FileNameRole, fileName);
     if (duration > 0)
         item->setData(FileDurationRole, duration);
-    //QVariant v;
-    //v.setValue<ChapterList>(chapters);
+    // QVariant v;
+    // v.setValue<ChapterList>(chapters);
     QVariant v = QVariant::fromValue<ChapterList>(chapters);
     item->setData(ChaptersRole, v);
 
