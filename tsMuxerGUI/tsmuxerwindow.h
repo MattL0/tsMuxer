@@ -202,7 +202,7 @@ class TsMuxerWindow : public QWidget
 #else
     bool sound;
 #endif
-    
+
     void myPlaySound(const QString& fileName);
     bool isVideoCropped();
 };
