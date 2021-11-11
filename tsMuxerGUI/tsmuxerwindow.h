@@ -22,6 +22,7 @@ class TsMuxerWindow;
 }
 
 class QnCheckBoxedHeaderView;
+class FontSettingsTableModel;
 
 typedef QList<double> ChapterList;
 
@@ -196,6 +197,8 @@ class TsMuxerWindow : public QWidget
     QSoundEffect sound;
     void myPlaySound(const QString& fileName);
     bool isVideoCropped();
+
+    FontSettingsTableModel* fontSettingsModel;
 };
 
 Q_DECLARE_METATYPE(ChapterList);
