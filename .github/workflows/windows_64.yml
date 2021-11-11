@@ -1,12 +1,13 @@
+
 name: Build for Windows 64-bit
-  # Allows you to run this workflow manually from the Actions tab
+
 on:
   push:
     branches: [master]
 
 jobs:
   build:
-  
+
     runs-on: ubuntu-latest
     
     container:
