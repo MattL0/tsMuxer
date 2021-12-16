@@ -6,7 +6,10 @@
 
 TEMPLATE = app
 TARGET = tsMuxerGUI
-QT = core gui widgets multimedia
+QT = core gui widgets
+qtHaveModule(multimedia) {
+  QT += multimedia
+}
 CONFIG += c++17 strict_c++ lrelease embed_translations
 
 HEADERS += tsmuxerwindow.h lang_codes.h muxForm.h checkboxedheaderview.h \
@@ -19,6 +22,9 @@ RESOURCES += images.qrc
 TRANSLATIONS = translations/tsmuxergui_en.ts translations/tsmuxergui_ru.ts translations/tsmuxergui_fr.ts translations/tsmuxergui_zh.ts
 win32 {
   RC_FILE += icon.rc
+}
+win32-msvc* {
+  QMAKE_CXXFLAGS += /utf-8
 }
 
 version_num = 2.6.16

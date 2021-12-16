@@ -279,6 +279,7 @@ void ByteFileWriter::writeDString(const std::string& value, int len) { writeDStr
 
 void ByteFileWriter::doPadding(int padSize)
 {
+    m_curPos--;
     int rest = (m_curPos - m_buffer) % padSize;
     if (rest)
     {
@@ -395,7 +396,8 @@ void FileEntryInfo::serializeFile()
 
     memset(buffer, 0, sizeof(buffer));
 
-    int writed = m_owner->writeExtentFileDescriptor(m_fileType, m_fileSize, m_sectorNum, 1, &m_extents);
+    int writed = m_owner->writeExtentFileDescriptor(m_name == "*UDF Unique ID Mapping Data", m_objectId, m_fileType,
+                                                    m_fileSize, m_sectorNum, 1, &m_extents);
     assert(writed == m_sectorsUsed);
 }
 
@@ -415,10 +417,11 @@ void FileEntryInfo::serializeDir()
     writer.writeLE8(0x0A);   // File Characteristics, parent flag (3-th bit) and  'directory' bit (1-th)
     writer.writeLE8(0x00);   // Length of File Identifier (=L_FI)
 
+    int parentId = m_parent ? m_parent->m_objectId : 0;
     writer.writeLongAD(0x800, m_parent ? m_parent->m_sectorNum : m_owner->absoluteSectorNum(), 0x01,
-                       0);  // parent entry ICB
-    writer.writeLE16(0);    // Length of Implementation Use
-    writer.writeLE16(0);    // zero d-string for parent FID
+                       parentId);  // parent entry ICB
+    writer.writeLE16(0);           // Length of Implementation Use
+    writer.writeLE16(0);           // zero d-string for parent FID
     writer.closeDescriptorTag();
 
     // ------------ 2 (entries) ---------------
@@ -426,7 +429,7 @@ void FileEntryInfo::serializeDir()
     for (auto& i : m_subDirs) writeEntity(writer, i);
     assert(writer.size() < SECTOR_SIZE);  // not supported
 
-    m_owner->writeExtentFileDescriptor(m_fileType, writer.size(), m_sectorNum + 1, m_subDirs.size() + 1);
+    m_owner->writeExtentFileDescriptor(0, m_objectId, m_fileType, writer.size(), m_sectorNum + 1, m_subDirs.size() + 1);
     m_owner->writeSector(buffer);
 }
 
@@ -850,8 +853,8 @@ void IsoWriter::close()
     int64_t sz = m_file.size();
     m_metadataMirrorLBN = m_file.size() / SECTOR_SIZE + 1;
     m_tagLocationBaseAddr = m_partitionStartAddress;
-    writeExtentFileDescriptor(FileType_MetadataMirror, m_metadataFileLen, m_metadataMirrorLBN - m_partitionStartAddress,
-                              0);
+    writeExtentFileDescriptor(0, 0, FileType_MetadataMirror, m_metadataFileLen,
+                              m_metadataMirrorLBN - m_partitionStartAddress, 0);
 
     // allocate space for metadata mirror file
     memset(m_buffer, 0, sizeof(m_buffer));
@@ -871,7 +874,7 @@ void IsoWriter::close()
     m_file.seek(1024 * 576);
     // metadata file location and length (located at 576K, point to 640K address)
     m_tagLocationBaseAddr = m_partitionStartAddress;  //(1024 * 576)/SECTOR_SIZE;
-    writeExtentFileDescriptor(FileType_Metadata, m_metadataFileLen, m_metadataLBN - m_partitionStartAddress, 0);
+    writeExtentFileDescriptor(0, 0, FileType_Metadata, m_metadataFileLen, m_metadataLBN - m_partitionStartAddress, 0);
     m_tagLocationBaseAddr = m_metadataLBN;  // I don't know why. I doing just as scenarist does
     writeMetadata(m_metadataLBN);
 
@@ -975,8 +978,8 @@ void IsoWriter::writeAllocationExtentDescriptor(ExtentList* extents, size_t star
     m_file.write(m_buffer, SECTOR_SIZE);
 }
 
-int IsoWriter::writeExtentFileDescriptor(uint8_t fileType, uint64_t len, uint32_t pos, int linkCount,
-                                         ExtentList* extents)
+int IsoWriter::writeExtentFileDescriptor(bool namedStream, uint32_t objectId, uint8_t fileType, uint64_t len,
+                                         uint32_t pos, int linkCount, ExtentList* extents)
 {
     int sectorsWrited = 0;
 
@@ -987,7 +990,7 @@ int IsoWriter::writeExtentFileDescriptor(uint8_t fileType, uint64_t len, uint32_
     uint16_t* buff16 = (uint16_t*)m_buffer;
     uint64_t* buff64 = (uint64_t*)m_buffer;
 
-    writeIcbTag(m_buffer + 16, fileType);
+    writeIcbTag(namedStream, m_buffer + 16, fileType);
 
     buff32[36 / 4] = 0xffffffff;  // uid
     buff32[40 / 4] = 0xffffffff;  // guid
@@ -1029,6 +1032,7 @@ int IsoWriter::writeExtentFileDescriptor(uint8_t fileType, uint64_t len, uint32_
     // skip Stream Directory ICB
 
     strcpy((char*)m_buffer + 169, m_impId.c_str());  // Implementation Identifier
+    m_buffer[200] = objectId;                        // Unique ID
 
     // skip Length of Extended Attributes
     if (fileType != FileType_File && fileType != FileType_RealtimeFile)
@@ -1087,7 +1091,7 @@ int IsoWriter::writeExtentFileDescriptor(uint8_t fileType, uint64_t len, uint32_
     return sectorsWrited;
 }
 
-void IsoWriter::writeIcbTag(uint8_t* buffer, uint8_t fileType)
+void IsoWriter::writeIcbTag(bool namedStream, uint8_t* buffer, uint8_t fileType)
 {
     uint32_t* buff32 = (uint32_t*)buffer;
     uint16_t* buff16 = (uint16_t*)buffer;
@@ -1100,10 +1104,12 @@ void IsoWriter::writeIcbTag(uint8_t* buffer, uint8_t fileType)
     // skip reserved byte
     buffer[11] = fileType;  // metadata file type
     // skip 6 byte zero Parent ICB Location
-    if (fileType != FileType_File && fileType != FileType_RealtimeFile)
-        buff16[18 / 2] = 0x20;  // flags. Archive: This bit shall be set to ONE when the file is created or is written.
+    if (fileType == FileType_File || fileType == FileType_RealtimeFile)
+        buff16[18 / 2] = 0x0021;  // flags: archive + long AD
     else
-        buff16[18 / 2] = 0x21;  // archive + long AD
+        buff16[18 / 2] = 0x0020;  // flags: archive
+    if (namedStream)
+        buff16[18 / 2] += 0x2000;  // flags: stream
 }
 
 void IsoWriter::writeFileSetDescriptor()
